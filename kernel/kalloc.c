@@ -9,6 +9,8 @@
 #include "riscv.h"
 #include "defs.h"
 
+#define PG_SIZE 4096
+
 void freerange(void *pa_start, void *pa_end);
 
 extern char end[]; // first address after kernel.
@@ -79,4 +81,12 @@ kalloc(void)
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk
   return (void*)r;
+}
+
+
+uint64 mem_free(){
+  int i=0;
+  for(struct run *p=kmem.freelist;p;p=p->next)
+    i++;
+  return PG_SIZE*i;
 }
