@@ -447,13 +447,6 @@ void h_vmprint(int depth,pagetable_t pagetable)
       for(int j=0;j<depth-1;j++)
         printf(".. ");
       printf("..");
-      /*if(depth==1)
-        printf("..");
-      else if(depth==2)
-        printf(".. ..");
-      else if(depth==3)
-        printf(".. .. ..");*/
-
       printf("%d: pte %p pa %p\n",i,pte,PTE2PA(pte));
     }
     

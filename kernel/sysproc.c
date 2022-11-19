@@ -7,6 +7,8 @@
 #include "spinlock.h"
 #include "proc.h"
 
+#define PAGE_SIZE 4096
+
 uint64
 sys_exit(void)
 {
@@ -77,11 +79,34 @@ sys_sleep(void)
 
 
 #ifdef LAB_PGTBL
-int
-sys_pgaccess(void)
+pte_t *
+walk(pagetable_t pagetable, uint64 va, int alloc);
+void sys_pgaccess(void)
 {
-  // lab pgtbl: your code here.
-  return 0;
+
+  uint64 bitmask = 0;
+  uint64 start_addr,buf;
+  int page_num;
+  argaddr(0,&start_addr);
+  argint(1, &page_num);
+  argaddr(2,&buf);
+  page_num=page_num%64;
+
+  uint64 *pp,pte;
+
+
+  pagetable_t pgt=myproc()->pagetable;
+  
+  for(int i=0;i<page_num;i++)
+  {
+    pp=walk(pgt,start_addr+i*PAGE_SIZE,0);
+    pte=*pp;
+    if(pte&PTE_A)
+      bitmask=bitmask|(1<<i);
+    *pp=pte&(~PTE_A);
+    
+  }
+  copyout(pgt,buf,(char *)&bitmask,sizeof(bitmask));
 }
 #endif
 
@@ -107,3 +132,5 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+
