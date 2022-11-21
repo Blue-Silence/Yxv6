@@ -141,6 +141,17 @@ found:
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
 
+  p->tick_uesd=0;
+  p->tick_touse=0;
+  p->timer_handler=0;
+  p->signal_flag=1;
+  if((p->sign_trapframe = (struct trapframe *)kalloc()) == 0)
+  {
+    freeproc(p);
+    release(&p->lock);
+    return 0;
+  }
+
   return p;
 }
 
