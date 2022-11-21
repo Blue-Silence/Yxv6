@@ -45,6 +45,14 @@ OBJS_KCSAN += \
 endif
 
 ifeq ($(LAB),$(filter $(LAB), lock))
+
+ifeq ($(LAB),pgtbl)
+OBJS += \
+	$K/vmcopyin.o
+endif
+
+ifeq ($(LAB),$(filter $(LAB), pgtbl lock))
+
 OBJS += \
 	$K/stats.o\
 	$K/sprintf.o
@@ -141,7 +149,11 @@ tags: $(OBJS) _init
 
 ULIB = $U/ulib.o $U/usys.o $U/printf.o $U/umalloc.o
 
+
 ifeq ($(LAB),$(filter $(LAB), lock))
+
+ifeq ($(LAB),$(filter $(LAB), pgtbl lock))
+
 ULIB += $U/statistics.o
 endif
 
@@ -214,6 +226,42 @@ UPROGS += \
 	$U/_cowtest
 endif
 
+
+
+	$U/_trace\
+	$U/_sysinfotest
+
+	$U/_sleep\
+	$U/_pingpong\
+	$U/_primes\
+	$U/_find\
+	$U/_xargs\
+
+
+
+ifeq ($(LAB),$(filter $(LAB), pgtbl lock))
+UPROGS += \
+	$U/_stats
+endif
+
+
+ifeq ($(LAB),traps)
+UPROGS += \
+	$U/_call\
+	$U/_bttest
+endif
+
+ifeq ($(LAB),lazy)
+UPROGS += \
+	$U/_lazytests
+endif
+
+ifeq ($(LAB),cow)
+UPROGS += \
+	$U/_cowtest
+endif
+
+
 ifeq ($(LAB),thread)
 UPROGS += \
 	$U/_uthread
@@ -232,9 +280,57 @@ barrier: notxv6/barrier.c
 	gcc -o barrier -g -O2 $(XCFLAGS) notxv6/barrier.c -pthread
 endif
 
+
 ifeq ($(LAB),pgtbl)
 UPROGS += \
 	$U/_pgtbltest
+
+ifeq ($(LAB),lock)
+UPROGS += \
+	$U/_kalloctest\
+	$U/_bcachetest
+endif
+
+ifeq ($(LAB),fs)
+UPROGS += \
+	$U/_bigfile
+endif
+
+
+
+ifeq ($(LAB),traps)
+UPROGS += \
+	$U/_call\
+	$U/_bttest
+endif
+
+ifeq ($(LAB),lazy)
+UPROGS += \
+	$U/_lazytests
+endif
+
+ifeq ($(LAB),cow)
+UPROGS += \
+	$U/_cowtest
+endif
+
+ifeq ($(LAB),thread)
+UPROGS += \
+	$U/_uthread
+
+$U/uthread_switch.o : $U/uthread_switch.S
+	$(CC) $(CFLAGS) -c -o $U/uthread_switch.o $U/uthread_switch.S
+
+$U/_uthread: $U/uthread.o $U/uthread_switch.o $(ULIB)
+	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o $U/_uthread $U/uthread.o $U/uthread_switch.o $(ULIB)
+	$(OBJDUMP) -S $U/_uthread > $U/uthread.asm
+
+ph: notxv6/ph.c
+	gcc -o ph -g -O2 $(XCFLAGS) notxv6/ph.c -pthread
+
+barrier: notxv6/barrier.c
+	gcc -o barrier -g -O2 $(XCFLAGS) notxv6/barrier.c -pthread
+
 endif
 
 ifeq ($(LAB),lock)
@@ -247,6 +343,9 @@ ifeq ($(LAB),fs)
 UPROGS += \
 	$U/_bigfile
 endif
+
+
+
 
 
 
