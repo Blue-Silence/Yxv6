@@ -5,15 +5,15 @@
 int
 main(int argc, char *argv[])
 {
-  int i;
+  char b;
+  int a[32];
+  for(int i=0;i<32;i++)
+    printf("%d\n",a[i]);
+  read(0,&b,1);
+  return 1;
+  /*for(int i=0;i<32;i++)
+    printf("%d\n",a[i]);
 
-  for(i = 1; i < argc; i++){
-    write(1, argv[i], strlen(argv[i]));
-    if(i + 1 < argc){
-      write(1, " ", 1);
-    } else {
-      write(1, "\n", 1);
-    }
-  }
-  exit(0);
+  //return 123;
+  exit(0);*/
 }

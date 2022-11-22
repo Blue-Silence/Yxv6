@@ -14,6 +14,9 @@ void freerange(void *pa_start, void *pa_end);
 extern char end[]; // first address after kernel.
                    // defined by kernel.ld.
 
+unsigned char pg_counters[(PHYSTOP+PGSIZE-1)/PGSIZE];
+#define PG_NUM(x) (((uint64)x)/PGSIZE)
+
 struct run {
   struct run *next;
 };
@@ -28,6 +31,7 @@ kinit()
 {
   initlock(&kmem.lock, "kmem");
   freerange(end, (void*)PHYSTOP);
+
 }
 
 void
@@ -56,10 +60,17 @@ kfree(void *pa)
 
   r = (struct run*)pa;
 
-  acquire(&kmem.lock);
-  r->next = kmem.freelist;
-  kmem.freelist = r;
-  release(&kmem.lock);
+  if(pg_counters[PG_NUM(pa)])
+    pg_counters[PG_NUM(pa)]--;
+
+  if(pg_counters[PG_NUM(pa)]==0)
+  {
+    acquire(&kmem.lock);
+    r->next = kmem.freelist;
+    kmem.freelist = r;
+    release(&kmem.lock);
+  }
+
 }
 
 // Allocate one 4096-byte page of physical memory.
@@ -78,5 +89,8 @@ kalloc(void)
 
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk
+  if(r)
+    pg_counters[PG_NUM(r)]++;
   return (void*)r;
 }
+

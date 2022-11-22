@@ -6,6 +6,8 @@
 #include "proc.h"
 #include "defs.h"
 
+#define HELPER(X) (((X)>>10)<<12)
+
 struct spinlock tickslock;
 uint ticks;
 
@@ -33,6 +35,8 @@ trapinithart(void)
 // handle an interrupt, exception, or system call from user space.
 // called from trampoline.S
 //
+extern unsigned char pg_counters[];
+int allocCOW(pagetable_t p,uint64 va);
 void
 usertrap(void)
 {
@@ -65,9 +69,36 @@ usertrap(void)
     intr_on();
 
     syscall();
+  } else if(r_scause()==13 || r_scause()==15){
+    
+    
+    uint64 addr=PGROUNDDOWN(r_stval());
+    pte_t *pte;
+    if((pte=walk(p->pagetable,addr,0))==0)
+        exit(-1);
+    if(*pte&PTE_COW)
+    {
+      if(allocCOW(p->pagetable,addr))
+      {
+        p->killed=1;
+        printf("Page used up.\n");
+        printf("ADDR : %p %p \n",addr,((*walk(p->pagetable,addr,0))>>10)<<12);
+      }
+    }
+    else
+    {
+      p->killed = 1;
+      printf("Page fault.\n");
+      printf("%d PID:%d PTE : %p\n",r_scause(),myproc()->pid,*walk(p->pagetable,addr,0));
+    }
   } else if((which_dev = devintr()) != 0){
     // ok
-  } else {
+  } else if (r_scause()==12){
+    printf("\n address: %p \n",*walk(p->pagetable,r_stval(),0));
+    p->killed=1;
+  } 
+  
+  else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     p->killed = 1;
@@ -216,5 +247,32 @@ devintr()
   } else {
     return 0;
   }
+}
+
+
+int allocCOW(pagetable_t pgt,uint64 va){
+  pte_t *pte=walk(pgt,va,0);
+  unsigned char *c=pg_counters+(PTE2PA(*pte)/PGSIZE);
+  uint64 flag=(PTE_FLAGS(*pte)& (~PTE_COW)) | PTE_W;
+  uint64 pa,opa;
+  if((*c)==1)
+    *pte=((*pte>>10)<<10)|flag;
+  else if((*c)==0)
+    return -1;
+  else 
+  {
+    (*c)--;
+    if((pa=(uint64)kalloc()))
+    {
+      opa=PTE2PA(*pte);
+      *pte=PA2PTE(pa)|flag;
+      printf("%p \n",*pte);
+      //copyout(myproc()->pagetable,va,(char *)opa,PGSIZE);
+      memmove((void *)pa, (void *)opa, PGSIZE);
+      return 0;
+    }
+    return -1;
+  }
+  return -1;
 }
 
