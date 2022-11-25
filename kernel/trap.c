@@ -45,8 +45,8 @@ usertrap(void)
   // since we're now in the kernel.
   w_stvec((uint64)kernelvec);
 
-  struct proc *p = myproc();
-  
+  struct proc *p = myproc(); 
+
   // save user program counter.
   p->trapframe->epc = r_sepc();
   
@@ -78,7 +78,11 @@ usertrap(void)
 
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2)
+  {
+    if(p->tick_touse)
+      p->tick_uesd++;
     yield();
+  }
 
   usertrapret();
 }
@@ -116,7 +120,17 @@ usertrapret(void)
   w_sstatus(x);
 
   // set S Exception Program Counter to the saved user pc.
-  w_sepc(p->trapframe->epc);
+  if(p->tick_touse<=p->tick_uesd && p->tick_touse && p->signal_flag)
+  {
+    p->signal_flag=0;
+    p->tick_uesd=p->tick_uesd-p->tick_touse;
+    w_sepc((uint64)p->timer_handler);
+    *(p->sign_trapframe)=*(p->trapframe);
+  }
+  else 
+    w_sepc(p->trapframe->epc);
+
+    
 
   // tell trampoline.S the user page table to switch to.
   uint64 satp = MAKE_SATP(p->pagetable);
