@@ -46,6 +46,7 @@ endif
 
 ifeq ($(LAB),$(filter $(LAB), lock))
 
+
 ifeq ($(LAB),pgtbl)
 OBJS += \
 	$K/vmcopyin.o
@@ -152,7 +153,10 @@ ULIB = $U/ulib.o $U/usys.o $U/printf.o $U/umalloc.o
 
 ifeq ($(LAB),$(filter $(LAB), lock))
 
+ifeq ($(LAB),$(filter $(LAB), lock))
+
 ifeq ($(LAB),$(filter $(LAB), pgtbl lock))
+
 
 ULIB += $U/statistics.o
 endif
@@ -262,6 +266,15 @@ UPROGS += \
 endif
 
 
+
+
+
+ifeq ($(LAB),$(filter $(LAB), lock))
+UPROGS += \
+	$U/_stats
+endif
+
+
 ifeq ($(LAB),thread)
 UPROGS += \
 	$U/_uthread
@@ -295,6 +308,7 @@ ifeq ($(LAB),fs)
 UPROGS += \
 	$U/_bigfile
 endif
+
 
 
 
@@ -333,6 +347,14 @@ barrier: notxv6/barrier.c
 
 endif
 
+ifeq ($(LAB),pgtbl)
+UPROGS += \
+	$U/_pgtbltest
+
+
+
+endif
+
 ifeq ($(LAB),lock)
 UPROGS += \
 	$U/_kalloctest\
@@ -343,6 +365,9 @@ ifeq ($(LAB),fs)
 UPROGS += \
 	$U/_bigfile
 endif
+
+
+
 
 
 
