@@ -23,17 +23,18 @@
 #include "fs.h"
 #include "buf.h"
 
+
 #define BUCKET_NUM 7
 #define HASH(X,Y) (((X%BUCKET_NUM)+(Y%BUCKET_NUM))%BUCKET_NUM)
 
 struct bcache {
   struct spinlock lock;
   struct buf buf[NBUF];
+  struct buf head;
 
   // Linked list of all buffers, through prev/next.
   // Sorted by how recently the buffer was used.
   // head.next is most recent, head.prev is least.
-  struct buf head;
 } bcache_buckets[BUCKET_NUM];
 struct spinlock grand_evit_lock;
 
@@ -73,6 +74,7 @@ struct buf* get_buf_in_one_entry(struct bcache *bcache);
 static struct buf*
 bget(uint dev, uint blockno)
 {
+  int oi = HASH(dev,blockno);
   struct bcache *bcache = &bcache_buckets[HASH(dev,blockno)];
   struct buf *b;
 
@@ -111,9 +113,9 @@ bget(uint dev, uint blockno)
 
 
 
-  for(int i=0;i<BUCKET_NUM;i++)
+  for(int i=1;i<BUCKET_NUM;i++)
   {
-    if(&bcache_buckets[i] == bcache)
+    if(&bcache_buckets[oi+i] == bcache)
       continue;
     struct bcache *nbcache = &bcache_buckets[i];
     acquire(&nbcache->lock);
