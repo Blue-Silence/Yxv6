@@ -53,7 +53,9 @@ int             readi(struct inode*, int, uint64, uint, uint);
 void            stati(struct inode*, struct stat*);
 int             writei(struct inode*, int, uint64, uint, uint);
 void            itrunc(struct inode*);
-uint64 vma_map(struct proc* p, uint64 addr);
+uint64          vma_map(struct proc* p, uint64 addr);
+struct VMA *    find_VMA(struct proc* p, uint64 addr);
+int             sys_munmap_h(uint64 addr);
 
 // ramdisk.c
 void            ramdiskinit(void);

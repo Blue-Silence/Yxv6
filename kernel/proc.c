@@ -283,6 +283,7 @@ fork(void)
   if((np = allocproc()) == 0){
     return -1;
   }
+  np->sz = p->sz;
 
   // Copy user memory from parent to child.
   if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
@@ -290,6 +291,8 @@ fork(void)
     release(&np->lock);
     return -1;
   }
+
+
   np->sz = p->sz;
 
   // copy saved user registers.
@@ -303,6 +306,13 @@ fork(void)
     if(p->ofile[i])
       np->ofile[i] = filedup(p->ofile[i]);
   np->cwd = idup(p->cwd);
+
+  for(int i=0;i<VMA_NUM;i++)
+    {
+      np->VMAS[i]=p->VMAS[i];
+      if(p->VMAS[i].valid)
+        filedup(p->VMAS[i].p);
+    }
 
   safestrcpy(np->name, p->name, sizeof(p->name));
 
@@ -355,6 +365,14 @@ exit(int status)
       p->ofile[fd] = 0;
     }
   }
+
+  for(int i=0;i<VMA_NUM;i++)
+    if(p->VMAS[i].valid)
+    {
+      for(int j=0;j<p->VMAS[i].length;j+=PGSIZE)
+        sys_munmap_h(p->VMAS[i].addr+j);
+      p->VMAS[i].valid = 0;
+    }
 
   begin_op();
   iput(p->cwd);

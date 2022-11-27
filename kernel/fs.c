@@ -674,17 +674,8 @@ nameiparent(char *path, char *name)
 }
 
 uint64 vma_map(struct proc* p, uint64 addr){
-  struct VMA *v = p->VMAS;
-  struct VMA *vma = 0;
-
-  for(int i=0;i<VMA_NUM;i++)
-  {
-    if(v[i].valid && v[i].addr<=addr && (v[i].addr+v[i].length)>addr)
-    {
-      vma = &v[i];
-      break;
-    }
-  }
+  //struct VMA *v = p->VMAS;
+  struct VMA *vma = find_VMA(p, addr);
 
   if(!vma)
     return -1;
@@ -708,9 +699,24 @@ uint64 vma_map(struct proc* p, uint64 addr){
       memset((void *)(pa+PGSIZE-remain),0,(uint) remain);
     
   *pte = 0;
-  mappages(p->pagetable, addr, PGSIZE, pa, (vma->permission)| PTE_V | PTE_U);
+  mappages(p->pagetable, addr, PGSIZE, pa, (vma->prot)| PTE_V | PTE_U);
   iunlock((vma->p)->ip);
   
   return 0;
   
+}
+
+struct VMA *find_VMA(struct proc* p, uint64 addr){
+  struct VMA *v = p->VMAS;
+  struct VMA *vma = 0;
+
+  for(int i=0;i<VMA_NUM;i++)
+  {
+    if(v[i].valid && v[i].addr<=addr && (v[i].addr+v[i].length)>addr)
+    {
+      vma = &v[i];
+      break;
+    }
+  }
+  return vma;
 }

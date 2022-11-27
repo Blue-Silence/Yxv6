@@ -485,6 +485,7 @@ sys_pipe(void)
   return 0;
 }
 
+
 uint64 sys_mmap(void){
   //uint64 addr;
   uint64 length,offset;
@@ -503,7 +504,6 @@ uint64 sys_mmap(void){
     //p->killed = 1;
     return -1;
   }
-  //struct file *p = filedup(p->ofile[fd]);
 
   struct VMA *vma = 0;
 
@@ -520,19 +520,88 @@ uint64 sys_mmap(void){
     panic("No vma region left.\n");
   
 
-  vma->valid = 1;
-  vma->p = filedup(p->ofile[fd]);
+  vma->prot = PTE_U | PTE_V;
   vma->addr = p->sz;
-  vma->length = length;
+  vma->length = length; //the length and offset must all be page-aligned.
   vma->offset = offset;
-  vma->permission = flags;
   vma->num_in_mem = length/PGSIZE;
+  vma->permission = flags;
+  if(prot&PROT_READ)
+      vma->prot = PTE_R | vma->prot;
+  if(prot&PROT_WRITE)
+      vma->prot = PTE_W | vma->prot;
+  if((flags&MAP_SHARED) && !(p->ofile[fd]->writable) && (prot&PROT_WRITE))
+  {
+    printf("Warning:Trying to write read-only file.\n");
+    return -1;
+  }
+    
+  if(p->ofile[fd]->type != FD_INODE)
+    panic("Mmapping a non-file.");
+  vma->p = filedup(p->ofile[fd]);
   p->sz+=length;
-  return p->sz-length;
+
+  pte_t *pte;
+  for(int i=0;i<length;i+=PGSIZE)
+  {
+    if((pte = walk(p->pagetable, vma->addr+i, 1)) == 0)
+        return -1;
+    *pte = PTE_S | PTE_V;
+  }
+
+  vma->valid = 1;
+  return vma->addr;
 }
 
+int sys_munmap_h(uint64 addr);
 uint64 sys_munmap(void){
-  //panic("sys_munmap!!!\n");
-  printf("LALALALALALALA\n");
-  return -1;
+  uint64 addr,len;
+  addr = argraw(0);
+  len = argraw(1);
+
+  for(int i=0;i<len;i+=PGSIZE)
+    if(sys_munmap_h(addr+i))
+      return -1;
+
+  return 0;
+}
+
+int sys_munmap_h(uint64 addr){
+
+  struct proc *p = myproc();
+  pte_t *pte = walk(p->pagetable, addr, 0);
+  if(!pte)
+    return -1;
+
+  struct VMA *vma = find_VMA(p,addr);
+  if(!vma)
+    return -1;
+  
+  if(((*pte) & (PTE_S)) && (*pte) & (PTE_V))
+  {
+    vma->num_in_mem--;
+  }
+  else if ((*pte) & (PTE_V))
+    {
+      if(vma->permission&MAP_SHARED)
+      {
+        vma->p->off = vma->offset+addr-vma->addr;
+        filewrite(vma->p,addr,PGSIZE);
+      }
+      uvmunmap(p->pagetable, addr, 1, 1);
+      vma->num_in_mem--;
+    }
+  else 
+    ;
+
+  *pte = PTE_S;
+  if(vma->num_in_mem == 0)
+  {
+    vma->valid = 0;
+    fileclose(vma->p);
+  }  
+
+  return 0;
+
+
 }

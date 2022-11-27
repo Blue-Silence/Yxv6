@@ -90,6 +90,8 @@ struct VMA{
   uint64 permission;
   uint64 offset;
   uint64 num_in_mem;
+  uint64 prot;
+  int fd;
 };
 
 // Per-process state

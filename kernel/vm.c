@@ -174,6 +174,8 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
   for(a = va; a < va + npages*PGSIZE; a += PGSIZE){
     if((pte = walk(pagetable, a, 0)) == 0)
       panic("uvmunmap: walk");
+    if((*pte & PTE_S) && ((*pte & PTE_V) == 0))
+      continue;
     if((*pte & PTE_V) == 0)
       panic("uvmunmap: not mapped");
     if(PTE_FLAGS(*pte) == PTE_V)
@@ -297,6 +299,8 @@ uvmfree(pagetable_t pagetable, uint64 sz)
 // physical memory.
 // returns 0 on success, -1 on failure.
 // frees any allocated pages on failure.
+
+
 int
 uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
 {
@@ -308,10 +312,21 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
       panic("uvmcopy: pte should exist");
-    if((*pte & PTE_V) == 0)
-      panic("uvmcopy: page not present");
-    pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
+    pa = PTE2PA(*pte);
+    if(*pte & PTE_S)
+    {
+      pte_t *npte;
+      if((npte = walk(new, i, 0)) == 0)
+        return -1;
+      *npte = *pte;
+      continue;
+    }
+    if((*pte & PTE_V) == 0)
+      {
+        printf("ADDR: %p %p sz:%p \n",i,*pte,sz);
+        panic("uvmcopy: page not present");
+      }
     if((mem = kalloc()) == 0)
       goto err;
     memmove(mem, (char*)pa, PGSIZE);
