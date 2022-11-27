@@ -33,6 +33,15 @@ int pgaccess(void *base, int len, void *mask);
 int ugetpid(void);
 #endif
 
+
+int sigalarm(int ticks, void (*handler)());
+int sigreturn(void);
+
+
+int trace(int);
+struct sysinfo;
+int sysinfo(struct sysinfo *);
+
 // ulib.c
 int stat(const char*, struct stat*);
 char* strcpy(char*, const char*);
