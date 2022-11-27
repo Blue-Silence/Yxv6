@@ -53,6 +53,7 @@ int             readi(struct inode*, int, uint64, uint, uint);
 void            stati(struct inode*, struct stat*);
 int             writei(struct inode*, int, uint64, uint, uint);
 void            itrunc(struct inode*);
+uint64 vma_map(struct proc* p, uint64 addr);
 
 // ramdisk.c
 void            ramdiskinit(void);
@@ -137,6 +138,7 @@ int             argstr(int, char*, int);
 int             argaddr(int, uint64 *);
 int             fetchstr(uint64, char*, int);
 int             fetchaddr(uint64, uint64*);
+uint64          argraw(int n);
 void            syscall();
 
 // trap.c
@@ -170,6 +172,7 @@ uint64          walkaddr(pagetable_t, uint64);
 int             copyout(pagetable_t, uint64, char *, uint64);
 int             copyin(pagetable_t, char *, uint64, uint64);
 int             copyinstr(pagetable_t, char *, uint64, uint64);
+pte_t *         walk(pagetable_t pagetable, uint64 va, int alloc);
 
 // plic.c
 void            plicinit(void);

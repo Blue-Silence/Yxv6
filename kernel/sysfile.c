@@ -484,3 +484,55 @@ sys_pipe(void)
   }
   return 0;
 }
+
+uint64 sys_mmap(void){
+  //uint64 addr;
+  uint64 length,offset;
+  int prot,flags,fd;
+  //addr = argraw(0);
+  length = argraw(1);
+  argint(2,&prot);
+  argint(3,&flags);
+  argint(4,&fd);
+  offset = argraw(5);
+
+  struct proc *p = myproc();
+  if(p->ofile[fd] == 0)
+  {
+    printf("File not open\n");
+    //p->killed = 1;
+    return -1;
+  }
+  //struct file *p = filedup(p->ofile[fd]);
+
+  struct VMA *vma = 0;
+
+  for(int i=0;i<VMA_NUM;i++)
+  {
+    if(p->VMAS[i].valid == 0)
+    {
+      vma = &p->VMAS[i];
+      break;
+    }
+  }
+
+  if(vma == 0)
+    panic("No vma region left.\n");
+  
+
+  vma->valid = 1;
+  vma->p = filedup(p->ofile[fd]);
+  vma->addr = p->sz;
+  vma->length = length;
+  vma->offset = offset;
+  vma->permission = flags;
+  vma->num_in_mem = length/PGSIZE;
+  p->sz+=length;
+  return p->sz-length;
+}
+
+uint64 sys_munmap(void){
+  //panic("sys_munmap!!!\n");
+  printf("LALALALALALALA\n");
+  return -1;
+}

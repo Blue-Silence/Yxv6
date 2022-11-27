@@ -672,3 +672,45 @@ nameiparent(char *path, char *name)
 {
   return namex(path, 1, name);
 }
+
+uint64 vma_map(struct proc* p, uint64 addr){
+  struct VMA *v = p->VMAS;
+  struct VMA *vma = 0;
+
+  for(int i=0;i<VMA_NUM;i++)
+  {
+    if(v[i].valid && v[i].addr<=addr && (v[i].addr+v[i].length)>addr)
+    {
+      vma = &v[i];
+      break;
+    }
+  }
+
+  if(!vma)
+    return -1;
+
+  uint64 off = addr - vma->addr;
+  ilock((vma->p)->ip);
+
+  uint64 pa;
+  pte_t *pte;
+  if((pa = (uint64)kalloc()) == 0 || (pte = walk(p->pagetable,addr,1)) == 0)
+  {
+    iunlock((vma->p)->ip);
+    if(pa==0)
+      printf("Page used up\n");
+    return -1;
+  }
+
+  int remain = PGSIZE;
+  
+  if((remain-=readi(vma->p->ip, 0, pa, vma->offset+off, PGSIZE)))
+      memset((void *)(pa+PGSIZE-remain),0,(uint) remain);
+    
+  *pte = 0;
+  mappages(p->pagetable, addr, PGSIZE, pa, (vma->permission)| PTE_V | PTE_U);
+  iunlock((vma->p)->ip);
+  
+  return 0;
+  
+}
