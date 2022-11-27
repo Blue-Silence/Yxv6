@@ -16,6 +16,8 @@
 #include "file.h"
 #include "fcntl.h"
 
+#define MAX_Symlink_DEPTH 10
+
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
 static int
@@ -283,71 +285,20 @@ create(char *path, short type, short major, short minor)
   return ip;
 }
 
+int sys_open_h(int depth, char *path, int omode);
 uint64
 sys_open(void)
 {
   char path[MAXPATH];
-  int fd, omode;
-  struct file *f;
-  struct inode *ip;
-  int n;
+  int fd;
+  int omode;
 
-  if((n = argstr(0, path, MAXPATH)) < 0 || argint(1, &omode) < 0)
+  if((argstr(0, path, MAXPATH)) < 0 || argint(1, &omode) < 0)
     return -1;
 
   begin_op();
-
-  if(omode & O_CREATE){
-    ip = create(path, T_FILE, 0, 0);
-    if(ip == 0){
-      end_op();
-      return -1;
-    }
-  } else {
-    if((ip = namei(path)) == 0){
-      end_op();
-      return -1;
-    }
-    ilock(ip);
-    if(ip->type == T_DIR && omode != O_RDONLY){
-      iunlockput(ip);
-      end_op();
-      return -1;
-    }
-  }
-
-  if(ip->type == T_DEVICE && (ip->major < 0 || ip->major >= NDEV)){
-    iunlockput(ip);
-    end_op();
-    return -1;
-  }
-
-  if((f = filealloc()) == 0 || (fd = fdalloc(f)) < 0){
-    if(f)
-      fileclose(f);
-    iunlockput(ip);
-    end_op();
-    return -1;
-  }
-
-  if(ip->type == T_DEVICE){
-    f->type = FD_DEVICE;
-    f->major = ip->major;
-  } else {
-    f->type = FD_INODE;
-    f->off = 0;
-  }
-  f->ip = ip;
-  f->readable = !(omode & O_WRONLY);
-  f->writable = (omode & O_WRONLY) || (omode & O_RDWR);
-
-  if((omode & O_TRUNC) && ip->type == T_FILE){
-    itrunc(ip);
-  }
-
-  iunlock(ip);
+  fd = sys_open_h(0, path, omode);
   end_op();
-
   return fd;
 }
 
@@ -483,4 +434,109 @@ sys_pipe(void)
     return -1;
   }
   return 0;
+}
+
+
+
+
+uint64 sys_symlink(void){
+  char path[MAXPATH];
+  char target[MAXPATH];
+  struct inode *ip;
+
+  if(argstr(0, target, MAXPATH) < 0 || argstr(1, path, MAXPATH) < 0)
+    return -1;
+
+  begin_op();
+
+
+  ip = create(path, T_SYMLINK, 0, 0);
+  if(ip == 0)
+  {
+    end_op();
+    return -1;
+  }
+
+  if(writei(ip, 0, (uint64)target, 0, sizeof(target)) < sizeof(target))
+  {
+    iunlockput(ip);
+    end_op();
+    return -1;
+  }
+
+  iunlockput(ip);
+  end_op();
+  return 0;
+
+  }
+
+int sys_open_h(int depth, char *path, int omode)
+{
+  int fd;
+  struct file *f;
+  struct inode *ip;
+
+  if(depth>MAX_Symlink_DEPTH)
+  {
+    //printf("Max symlink depth exceeded\n");
+    return -1;
+  }
+
+  if(omode & O_CREATE){
+    ip = create(path, T_FILE, 0, 0);
+    if(ip == 0){
+      return -1;
+    }
+  } else {
+    if((ip = namei(path)) == 0){
+      return -1;
+    }
+    ilock(ip);
+    if(ip->type == T_DIR && omode != O_RDONLY){
+      iunlockput(ip);
+      return -1;
+    }
+  }
+
+  if(ip->type == T_SYMLINK && !(omode & O_NOFOLLOW))
+  {    
+    if(readi(ip, 0, (uint64)path, 0, MAXPATH)<0)
+    {
+      iunlockput(ip);
+      return -1;
+    }
+    iunlockput(ip);
+    return sys_open_h(depth+1, path, omode);
+  }
+  
+  if(ip->type == T_DEVICE && (ip->major < 0 || ip->major >= NDEV)){
+    iunlockput(ip);
+    return -1;
+  }
+
+  if((f = filealloc()) == 0 || (fd = fdalloc(f)) < 0){
+    if(f)
+      fileclose(f);
+    iunlockput(ip);
+    return -1;
+  }
+
+  if(ip->type == T_DEVICE){
+    f->type = FD_DEVICE;
+    f->major = ip->major;
+  } else {
+    f->type = FD_INODE;
+    f->off = 0;
+  }
+  f->ip = ip;
+  f->readable = !(omode & O_WRONLY);
+  f->writable = (omode & O_WRONLY) || (omode & O_RDWR);
+
+  if((omode & O_TRUNC) && ip->type == T_FILE){
+    itrunc(ip);
+  }
+
+  iunlock(ip);
+
+  return fd;
 }
