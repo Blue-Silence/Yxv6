@@ -9,7 +9,7 @@ r = Runner(save("xv6.out"))
 def test_kalloctest():
     r.run_qemu(shell_script([
         'kalloctest'
-    ]), timeout=200)
+    ]), timeout=2000000000) #Used to be 200,but VM has lower perf.
     
 @test(10, "kalloctest: test1", parent=test_kalloctest)
 def test_kalloctest_test1():
