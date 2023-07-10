@@ -418,7 +418,7 @@ bmap(struct inode *ip, uint bn)
 
     if((addr = a[bbn]) == 0)
       {
-        addr = a[bbn] == balloc(ip->dev);
+        addr = a[bbn] = balloc(ip->dev);
         log_write(bp);
       }
 
