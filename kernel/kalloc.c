@@ -14,6 +14,9 @@ void freerange(void *pa_start, void *pa_end);
 extern char end[]; // first address after kernel.
                    // defined by kernel.ld.
 
+static unsigned char pg_counters[(PHYSTOP+PGSIZE-1)/PGSIZE];
+#define PG_NUM(x) (((uint64)x)/PGSIZE)
+
 struct run {
   struct run *next;
 };
@@ -28,15 +31,18 @@ kinit()
 {
   initlock(&kmem.lock, "kmem");
   freerange(end, (void*)PHYSTOP);
+
 }
 
 void
 freerange(void *pa_start, void *pa_end)
 {
+  void kfree_param(void *pa, int isInit);
   char *p;
   p = (char*)PGROUNDUP((uint64)pa_start);
   for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE)
-    kfree(p);
+    //kfree(p);
+    kfree_param(p, 1);
 }
 
 // Free the page of physical memory pointed at by v,
@@ -44,7 +50,7 @@ freerange(void *pa_start, void *pa_end)
 // call to kalloc().  (The exception is when
 // initializing the allocator; see kinit above.)
 void
-kfree(void *pa)
+kfree_param(void *pa, int isInit)
 {
   struct run *r;
 
@@ -52,15 +58,56 @@ kfree(void *pa)
     panic("kfree");
 
   // Fill with junk to catch dangling refs.
-  memset(pa, 1, PGSIZE);
+  //memset(pa, 1, PGSIZE);
 
   r = (struct run*)pa;
-
   acquire(&kmem.lock);
-  r->next = kmem.freelist;
-  kmem.freelist = r;
+  if(pg_counters[PG_NUM(pa)])
+    pg_counters[PG_NUM(pa)]--;
+  else if (!isInit)
+    panic("REFCOUNT FREE ERROR!");
+
+  if(pg_counters[PG_NUM(pa)]==0)
+  {
+    r->next = kmem.freelist;
+    kmem.freelist = r;
+  }
   release(&kmem.lock);
+
 }
+
+void
+kfree(void *pa)
+{
+  kfree_param(pa, 0);
+}
+
+/*void
+kfree(void *pa)
+/{
+  struct run *r;
+
+  if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
+    panic("kfree");
+
+  // Fill with junk to catch dangling refs.
+  //memset(pa, 1, PGSIZE);
+
+  r = (struct run*)pa;
+  acquire(&kmem.lock);
+  if(pg_counters[PG_NUM(pa)])
+    pg_counters[PG_NUM(pa)]--;
+  else 
+    ;//printf("REFCOUNT FREE ERROR!");
+
+  if(pg_counters[PG_NUM(pa)]==0)
+  {
+    r->next = kmem.freelist;
+    kmem.freelist = r;
+  }
+  release(&kmem.lock);
+
+}*/
 
 // Allocate one 4096-byte page of physical memory.
 // Returns a pointer that the kernel can use.
@@ -74,9 +121,27 @@ kalloc(void)
   r = kmem.freelist;
   if(r)
     kmem.freelist = r->next;
-  release(&kmem.lock);
 
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk
+  if(r)
+  {
+    if(pg_counters[PG_NUM(r)]!=0)
+      panic("REFCOUNT MALLOC ERROR!");
+    pg_counters[PG_NUM(r)]++;
+  }
+    
+  release(&kmem.lock);
   return (void*)r;
 }
+
+int changeMemRefC(uint64 pa, int s) {
+  acquire(&kmem.lock);
+  pg_counters[PG_NUM(pa)] += s;
+  int re = pg_counters[PG_NUM(pa)];
+  if(re<0)
+    panic("Memory reference count error.");
+  release(&kmem.lock);
+  return re;
+}
+

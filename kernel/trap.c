@@ -6,6 +6,8 @@
 #include "proc.h"
 #include "defs.h"
 
+#define HELPER(X) (((X)>>10)<<12)
+
 struct spinlock tickslock;
 uint ticks;
 
@@ -33,6 +35,8 @@ trapinithart(void)
 // handle an interrupt, exception, or system call from user space.
 // called from trampoline.S
 //
+
+int allocCOW(pagetable_t p,uint64 va);
 void
 usertrap(void)
 {
@@ -65,9 +69,37 @@ usertrap(void)
     intr_on();
 
     syscall();
+  } else if(r_scause()==13 || r_scause()==15){
+    
+    
+    uint64 addr=PGROUNDDOWN(r_stval());
+    pte_t *pte;
+    //if(==0)
+        //exit(-1);
+    if(addr < MAXVA && (pte=walk(p->pagetable,addr,0)) && *pte&PTE_COW)
+    {
+      if(allocCOW(p->pagetable,addr))
+      //{
+        p->killed=1;
+        //printf("Page used up.\n");
+        //printf("ADDR : %p %p \n",addr,((*walk(p->pagetable,addr,0))>>10)<<12);
+      //}
+      /*else 
+      {
+        printf("Alloc!.\n");
+        printf("ADDR : %p %p \n",addr,((*walk(p->pagetable,addr,0))>>10)<<12);
+      }*/
+    }
+    else
+    {
+      p->killed = 1;
+      printf("usertrap(): unexpected scause %p pid=%d  (Page fault)\n", r_scause(), p->pid);
+      printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+    }
   } else if((which_dev = devintr()) != 0){
     // ok
-  } else {
+  }
+  else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     p->killed = 1;
@@ -215,6 +247,44 @@ devintr()
     return 2;
   } else {
     return 0;
+  }
+}
+
+
+int allocCOW(pagetable_t pgt,uint64 va){
+  pte_t *pte=walk(pgt,va,0);
+  uint64 flag=(PTE_FLAGS(*pte)& (~PTE_COW)) | PTE_W;
+  uint64 pa,opa;
+  /*if((*c)==1)
+  {
+    *pte=((*pte>>10)<<10)|flag;
+    return 0;
+  }*/
+  if(0)
+    ;
+  else if((changeMemRefC(PTE2PA(*pte),0))==0)
+  {
+    //printf("EXIT 1.\n");
+    return -1;
+  }
+  else 
+  {
+    if((pa=(uint64)kalloc()))
+    {
+      opa=PTE2PA(*pte);
+      *pte=PA2PTE(pa)|flag;
+      //printf("%p \n",*pte);
+      memmove((void *)pa, (void *)opa, PGSIZE);
+      kfree((void*)opa);
+      return 0;
+    }
+
+    {
+      return -1;
+    }
+  }
+  {
+    return -1;
   }
 }
 
