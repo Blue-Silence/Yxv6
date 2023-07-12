@@ -167,6 +167,11 @@ freeproc(struct proc *p)
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
   p->pagetable = 0;
+
+  if(p->sign_trapframe)
+    kfree((void*)p->sign_trapframe);
+  p->sign_trapframe=0;
+
   p->sz = 0;
   p->pid = 0;
   p->parent = 0;
