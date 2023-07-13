@@ -115,7 +115,7 @@ bget(uint dev, uint blockno)
 
   for(int i=1;i<BUCKET_NUM;i++)
   {
-    if(&bcache_buckets[oi+i] == bcache)
+    if(&bcache_buckets[(oi+i)%BUCKET_NUM] == bcache)
       continue;
     struct bcache *nbcache = &bcache_buckets[i];
     acquire(&nbcache->lock);
